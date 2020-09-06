@@ -1,7 +1,7 @@
 import csv
 import os
 
-file = "Newdata.csv"
+file = "data.csv"
 
 def writeFile(data):
     fieldnames = []
