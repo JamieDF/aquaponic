@@ -5,6 +5,7 @@ from smbus2 import SMBus
 import bme280
 import Adafruit_DHT
 from datetime import datetime
+import time
 
 
 
@@ -27,6 +28,7 @@ class Sensors(object):
         error = False
         humidity = None
         temperature = None
+        attempts = 0
         try:
             self.air_sensor = bme280.sample(bus=self.sensor_bus)
         except Exception as e:
@@ -34,7 +36,13 @@ class Sensors(object):
             print("Error running air sensor : "+ str(e))
         
         try:
-            humidity, temperature = Adafruit_DHT.read_retry(self.DHT_SENSOR, self.DHT_PIN)
+            while attempts < 10:
+                humidity, temperature = Adafruit_DHT.read_retry(self.DHT_SENSOR, self.DHT_PIN)
+                if humidity and temperature:
+                    break
+                else:
+                    attempts += 1
+                    time.sleep(2)
         except Exception as e:
             error = True
             print("Error running DHT air sensor : "+ str(e))
@@ -64,6 +72,3 @@ class Sensors(object):
         if not isError:
             returnData.update(data)
             return returnData
-
-test = Sensors()
-print(test.get_data())
