@@ -3,6 +3,7 @@
 from smbus2 import SMBus
 #from smbus import SMBus
 import bme280
+from datetime import datetime
 
 class Sensors(object):
     def __init__(self):
