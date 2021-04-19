@@ -1,6 +1,6 @@
 import time
 from time import localtime, strftime
-from datetime import datetime
+from datetime import datetime, date
 from decimal import Decimal
 from sensors import Sensors
 import csv   
@@ -12,7 +12,7 @@ app = Flask(__name__)
 CORS(app)
 
 SensorObject = Sensors()
-data_keys = ["id", "time", "air_temp", "humidity", "pressure", "air_temp_DHT", "humidity_DHT"]
+data_keys = ["time", "air_temp", "humidity", "pressure", "air_temp_DHT", "humidity_DHT"]
 
 def myconverter(o):
     if isinstance(o, datetime):
@@ -30,13 +30,14 @@ except:
     record_backlog = []
 
 def routine():
+    todaysFile = date.today().strftime("%d%m%y")
     sensorData = SensorObject.get_data()
     print(sensorData)
     if sensorData:
         record_backlog.append(sensorData)
         if record_backlog:
             for record in record_backlog[:]: 
-                if writeToCSV("data/testfile.csv", record): 
+                if writeToCSV("data/"+ str(todaysFile) +".csv", record): 
                     record_backlog.remove(record) 
                 else:
                     print("Keeping record in backlog")
@@ -72,11 +73,7 @@ def get_current_sensors():
 
 scheduler = BackgroundScheduler(timezone="Europe/London")
 scheduler.add_job(func=routine, trigger="cron", minute='0')
-scheduler.add_job(func=routine, trigger="cron", minute='10')
-scheduler.add_job(func=routine, trigger="cron", minute='20')
 scheduler.add_job(func=routine, trigger="cron", minute='30')
-scheduler.add_job(func=routine, trigger="cron", minute='40')
-scheduler.add_job(func=routine, trigger="cron", minute='50')
 
 scheduler.start()
 now = datetime.now()
