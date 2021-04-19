@@ -12,7 +12,7 @@ app = Flask(__name__)
 CORS(app)
 
 SensorObject = Sensors()
-data_keys = ["id", "time", "air_temp", "humidity", "pressure"]
+data_keys = ["id", "time", "air_temp", "humidity", "pressure", "air_temp_DHT", "humidity_DHT"]
 
 def myconverter(o):
     if isinstance(o, datetime):
@@ -72,7 +72,12 @@ def get_current_sensors():
 
 scheduler = BackgroundScheduler(timezone="Europe/London")
 scheduler.add_job(func=routine, trigger="cron", minute='0')
+scheduler.add_job(func=routine, trigger="cron", minute='10')
+scheduler.add_job(func=routine, trigger="cron", minute='20')
 scheduler.add_job(func=routine, trigger="cron", minute='30')
+scheduler.add_job(func=routine, trigger="cron", minute='40')
+scheduler.add_job(func=routine, trigger="cron", minute='50')
+
 scheduler.start()
 now = datetime.now()
 print("Monitor Active at " + str(now.strftime("%c")))
