@@ -1,94 +1,104 @@
-
 import time
 from time import localtime, strftime
-#import Adafruit_DHT
-try:
-    from smbus2 import SMBus
-except ImportError:
-    from smbus import SMBus
-from bme280 import BME280
-from w1thermsensor import W1ThermSensor
+from datetime import datetime
+from decimal import Decimal
+from sensors import Sensors
+from display import Display
+from database import db
+import analytics
 import json
-import csvStore
-import graph
-import Adafruit_GPIO.SPI as SPI
-import Adafruit_SSD1306
-from PIL import Image
-from PIL import ImageDraw
-from PIL import ImageFont
-RST = None
-disp = Adafruit_SSD1306.SSD1306_128_64(rst=RST, i2c_address=0x3C)
-sensor = W1ThermSensor()
-#DHT_SENSOR = Adafruit_DHT.DHT22
-#DHT_PIN = 17
-bus = SMBus(1)
-bme280 = BME280(i2c_dev=bus)
-disp.begin()
+from flask import Flask, request
+from flask_cors import CORS
+from apscheduler.schedulers.background import BackgroundScheduler
+app = Flask(__name__)
+CORS(app)
 
-# Clear display.
-disp.clear()
-disp.display()
+SensorObject = Sensors()
+DisplayObject = Display()
+DB = db()
+data_keys = ["id", "time", "water_temp", "air_temp", "humidity", "pressure"]
 
-print("Running")
-data_list = []
+def myconverter(o):
+    if isinstance(o, datetime):
+        return o.__str__()
+    elif isinstance(o, Decimal):
+        return float(o)
 
-width = disp.width
-height = disp.height
-image = Image.new('1', (width, height))
+try:
+    record_backlog = []
+    with open('record_backlog.json') as json_file:  
+        _data = json.load(json_file)
+        if _data:
+            record_backlog = _data
+except:
+    record_backlog = []
 
-draw = ImageDraw.Draw(image)
-font = ImageFont.load_default()
+def routine():
+    sensorData = SensorObject.get_data()
+    print(sensorData)
+    if sensorData:
+        record_backlog.append(sensorData)
+        
+        if record_backlog:
+            for record in record_backlog[:]: 
+                if DB.insert_record("hourly_logs", record): 
+                    record_backlog.remove(record) 
+                else:
+                    print("Keeping record in backlog")
+                    break
 
-# Draw a black filled box to clear the image.
-draw.rectangle((0,0,width,height), outline=0, fill=0)
-
-# Draw some shapes.
-# First define some constants to allow easy resizing of shapes.
-padding = -2
-top = padding
-bottom = height-padding
-# Move left to right keeping track of the current x position for drawing shapes.
-x = 0
-avrageWater = 0
-avrageAir = 0
-
-while True:
-    #humidity, airTemperature = Adafruit_DHT.read_retry(DHT_SENSOR, DHT_PIN)
-    temperature = round(bme280.get_temperature(), 3)
-    pressure = round(bme280.get_pressure(),3)
-    humidity = round(bme280.get_humidity(), 3)
-    waterTemperature = round(sensor.get_temperature(), 3)
-
-    if humidity is not None and temperature is not None and pressure is not None:
-        print("Air Temp={0:0.1f}*C  Humidity={1:0.1f}%  Pressure={0:05.2f}hPa".format(temperature, humidity, pressure))
+            print("Storing record_backlog")
+            try:
+                with open('record_backlog.json', 'w') as outfile:
+                    json.dump(record_backlog, outfile, indent=4)
+            except Exception as e:
+                print("Error: " + str(e))
     else:
-        print("Failed to retrieve data from air sensor")
+        print("SENSORDATA == Null")
+    DisplayObject.draw_data(sensorData, str(strftime("%d %b %Y %H:%M:%S", localtime())))
 
-    if waterTemperature is not None:
-        print("The water temperature is %s celsius" % waterTemperature)
-    else:
-        print("Failed to retrieve data from water sensor")
+    
+@app.route('/get_current_sensors', methods=['POST'])
+def get_current_sensors():
+    try:
+        return json.dumps(SensorObject.get_data()), 200, {'Content-Type': 'application/json'}
+    except Exception as e:
+        return json.dumps({"sensorTest Fail": str(e)}), 200, {'Content-Type': 'application/json'}
 
-    data_list.append({"time": str(strftime("%d %b %Y %H:%M:%S", localtime())), "humidity":humidity, "temperature":temperature,"pressure":pressure, "waterTemperature":waterTemperature})
-    if len(data_list) > 50:
-        print("Writing To file")
-        csvStore.writeFile(data_list)
-        data_list = []
-        #try:
-        #    print("Creating Graph")
-        #    avrageWater, avrageAir = graph.createGraph()
-        #except Exception as e:
-        #    print(e)
-    draw.rectangle((0,0,width,height), outline=0, fill=0)
-    # Display image.
-    draw.text((x, top),       "Air Temp: " + str(temperature) + "*C",  font=font, fill=255)
-    draw.text((x, top+8),     "Humidity: " + str(humidity)+ "%", font=font, fill=255)
-    draw.text((x, top+16),    "Pressure: " + str(pressure)+ "hPa",  font=font, fill=255)
-    draw.text((x, top+25),    "Water Temp: " +  str(waterTemperature) +"*C",  font=font, fill=255)
-    draw.text((x, top+34),    "Average water:" + str(avrageWater) + "*C",  font=font, fill=255)
-    draw.text((x, top+43),    "Average air:" + str(avrageAir) + "*C",  font=font, fill=255)
-    draw.text((x, top+52),    str(strftime("%d %b %Y %H:%M:%S", localtime())),  font=font, fill=255)
+@app.route('/get_sensor_logs', methods=['POST'])
+def get_sensor_logs():
+    try:
+        _jsonData = request.get_json(force=True)
+        print(_jsonData)
 
-    disp.image(image)
-    disp.display()
-    time.sleep(15)
+        if _jsonData['target'] == "Today":
+            today = datetime.today()
+            daystart = datetime(year=today.year, month=today.month, day=today.day, hour=0, second=0).strftime("%a, %d %b %Y %H:%M:%S")
+            dt = datetime.now()
+            dt = dt.strftime("%a, %d %b %Y %H:%M:%S")
+            _data={"logs":DB.get_records_between("hourly_logs", data_keys, "time", daystart, dt)}
+            _data['analytics'] = analytics.generate(_data["logs"])
+            return json.dumps(_data, default = myconverter), 200, {'Content-Type': 'application/json'}
+        elif _jsonData['target'] == "Specific":
+            start_date = datetime.strptime(_jsonData['start_date'],"%Y-%m-%d %H:%M")
+            end_date = datetime.strptime(_jsonData['end_date'],"%Y-%m-%d %H:%M")
+            _data={"logs":DB.get_records_between("hourly_logs", data_keys, "time", start_date, end_date)}
+            _data['analytics'] = analytics.generate(_data["logs"])
+            return json.dumps(_data, default = myconverter), 200, {'Content-Type': 'application/json'}
+        else:
+            _data={"logs":DB.get_records_between("hourly_logs", data_keys)}
+            _data['analytics'] = analytics.generate(_data["logs"])
+            return json.dumps(_data, default = myconverter), 200, {'Content-Type': 'application/json'}
+    except Exception as e:
+        return json.dumps({"get_sensor_logs Fail": str(e)}), 200, {'Content-Type': 'application/json'}
+
+
+scheduler = BackgroundScheduler(timezone="Europe/London")
+scheduler.add_job(func=routine, trigger="cron", minute='0')
+scheduler.add_job(func=routine, trigger="cron", minute='30')
+scheduler.start()
+now = datetime.now()
+print("Monitor Active at " + str(now.strftime("%c")))
+
+if __name__ == '__main__':
+    app.run(debug=True,use_reloader=False)
