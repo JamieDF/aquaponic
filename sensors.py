@@ -87,6 +87,6 @@ class Sensors(object):
                 
         if not isError:
             returnData.update(data)
-            returnData.update
-            return returnData(self.getWeather())
+            returnData.update(self.getWeather())
+            return returnData
 
