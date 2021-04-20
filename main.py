@@ -8,6 +8,8 @@ import json
 from flask import Flask, request
 from flask_cors import CORS
 from apscheduler.schedulers.background import BackgroundScheduler
+import os.path
+
 app = Flask(__name__)
 CORS(app)
 
@@ -53,9 +55,12 @@ def routine():
         print("SENSORDATA == Null")
 
 def writeToCSV(filename, item):
+    file_exists = os.path.isfile(filename)
     try:
         with open(filename, 'a') as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=data_keys)
+            if not file_exists:
+                writer.writeheader()
             writer.writerow(item)
         return True
     except Exception as e: 
