@@ -12,7 +12,7 @@ app = Flask(__name__)
 CORS(app)
 
 SensorObject = Sensors()
-data_keys = ["time", "air_temp", "humidity", "pressure", "air_temp_DHT", "humidity_DHT"]
+data_keys = ["time", "air_temp", "humidity", "pressure", "air_temp_DHT", "humidity_DHT", "outside_air_temp", "outside_humidity", "outside_pressure"]
 
 def myconverter(o):
     if isinstance(o, datetime):

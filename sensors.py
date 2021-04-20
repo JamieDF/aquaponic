@@ -6,6 +6,8 @@ import bme280
 import Adafruit_DHT
 from datetime import datetime
 import time
+import requests
+import json
 
 
 
@@ -36,13 +38,9 @@ class Sensors(object):
             print("Error running air sensor : "+ str(e))
         
         try:
-            while attempts < 10:
+            while (not humidity and not temperature):
                 humidity, temperature = Adafruit_DHT.read_retry(self.DHT_SENSOR, self.DHT_PIN)
-                if humidity and temperature:
-                    break
-                else:
-                    attempts += 1
-                    time.sleep(2)
+                time.sleep(2)
         except Exception as e:
             error = True
             print("Error running DHT air sensor : "+ str(e))
@@ -56,6 +54,24 @@ class Sensors(object):
             "humidity_DHT": humidity}
         return error
     
+    def getWeather(self):
+        output = {"outside_air_temp": None, "outside_humidity":None, "outside_pressure": None}
+        try:
+            targetURL = "http://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&units=metric&APPID=4048c2bfc3219e25cc2b99ab0d371978".format(lat=float(56.10963), lon=float(-3.1633400000000003))
+            response = requests.get(targetURL, timeout=30)
+            if response.ok:
+                formated_response = json.loads(response.content)  
+                weather = formated_response['weather'][0]['main']
+                output["outside_air_temp"] = weather['temp']
+                output["outside_humidity"] = weather['humidity']
+                output["outside_pressure"] = weather['pressure']
+                return output
+            else:
+                print("getWeather Response Error: " +str(response))
+        except Exception as errtxt:
+            print ("getWeather Exception: " + str(errtxt))
+        return output
+
     def get_data(self):
         isError = self.update_sensors()
         dt = datetime.now()
@@ -71,4 +87,6 @@ class Sensors(object):
                 
         if not isError:
             returnData.update(data)
-            return returnData
+            returnData.update
+            return returnData(self.getWeather())
+
