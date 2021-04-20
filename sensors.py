@@ -61,7 +61,7 @@ class Sensors(object):
             response = requests.get(targetURL, timeout=30)
             if response.ok:
                 formated_response = json.loads(response.content)  
-                weather = formated_response['weather'][0]['main']
+                weather = formated_response['main']
                 output["outside_air_temp"] = weather['temp']
                 output["outside_humidity"] = weather['humidity']
                 output["outside_pressure"] = weather['pressure']
