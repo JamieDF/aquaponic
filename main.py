@@ -3,6 +3,7 @@ from time import localtime, strftime
 from datetime import datetime, date
 from decimal import Decimal
 from sensors import Sensors
+from display import Display
 import csv   
 import json
 from flask import Flask, request
@@ -14,7 +15,8 @@ app = Flask(__name__)
 CORS(app)
 
 SensorObject = Sensors()
-data_keys = ["time", "air_temp", "humidity", "pressure", "air_temp_DHT", "humidity_DHT", "outside_air_temp", "outside_humidity", "outside_pressure"]
+DisplayObject = Display()
+data_keys = ["time","water_temp", "air_temp", "humidity", "pressure"]
 
 def myconverter(o):
     if isinstance(o, datetime):
@@ -53,6 +55,7 @@ def routine():
                 print("Error: " + str(e))
     else:
         print("SENSORDATA == Null")
+    DisplayObject.draw_data(sensorData, str(strftime("%d %b %Y %H:%M:%S", localtime())))
 
 def writeToCSV(filename, item):
     file_exists = os.path.isfile(filename)
